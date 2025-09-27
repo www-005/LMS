@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="sq">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Raportet - Mini LMS</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header class="topbar">
+      <div class="brand">Mini-LMS</div>
+      <div>
+        <span id="userBadge">Nuk je kyç</span>
+        <button id="logoutBtn" class="secondary">Dal</button>
+      </div>
+    </header>
+
+    <div class="app-grid">
+      <aside class="sidebar">
+        <a href="dashboard.html">Paneli</a>
+        <a href="profile.html">Profili</a>
+        <a href="courses.html">Lëndët</a>
+        <a href="schedule.html">Orari</a>
+        <a href="tests.html">Testet</a>
+        <a href="grades.html">Rezultatet</a>
+        <a href="reports.html" class="active">Raportet</a>
+      </aside>
+
+      <section class="main">
+        <div class="card">
+          <h1>Raportet</h1>
+        </div>
+
+        <div id="reportPanel" class="card">
+          <div id="reportSelectWrap" style="margin-bottom:12px;"></div>
+          <div id="reportCard"></div>
+        </div>
+
+      </section>
+    </div>
+  </div>
+
+  <!-- Firebase v8 -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-analytics.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCXKO1FJ0qbhwltBM15yL2YYIKsqykCf38",
+      authDomain: "mini-lms-b2c43.firebaseapp.com",
+      projectId: "mini-lms-b2c43",
+      storageBucket: "mini-lms-b2c43.firebasestorage.app",
+      messagingSenderId: "15157343523",
+      appId: "1:15157343523:web:bb67b75f8ab47bb47a4896",
+      measurementId: "G-JKL3SBEQ88"
+    };
+    firebase.initializeApp(firebaseConfig);
+    firebase.analytics();
+    window.auth = firebase.auth();
+    window.db = firebase.firestore();
+  </script>
+
+  <script src="app1.js"></script>
+
+  <script>
+    auth.onAuthStateChanged(user=>{
+      if(!user) return window.location.href='index.html';
+      db.collection('users').doc(user.uid).get().then(doc=>{
+        const u = doc.data();
+        const wrap = document.getElementById('reportSelectWrap');
+        const card = document.getElementById('reportCard');
+
+        if(u.role!=='teacher'){
+          wrap.innerHTML = '<div class="small">Vetëm mësuesit mund të shikojnë raportet e nxënësve.</div>';
+          return;
+        }
+
+        // dropdown me nxënësit e shkollës (ose të klasave)
+        db.collection('users').where('role','==','student').onSnapshot(s=>{
+          let html = '<select id="reportSelect"><option value="">Zgjidh nxënës</option>';
+          s.forEach(d=>{ const st = d.data(); html += `<option value="${d.id}">${st.name} (Klasa ${st.classNum|| '-'})</option>` });
+          html += '</select>';
+          wrap.innerHTML = html;
+
+          document.getElementById('reportSelect').addEventListener('change', ()=>{
+            const id = document.getElementById('reportSelect').value;
+            if(!id){ card.innerHTML=''; return; }
+            db.collection('grades').where('studentId','==',id).onSnapshot(ss=>{
+              let out = '<h3>Raporti</h3>';
+              let sum=0,count=0;
+              ss.forEach(dg=>{ const g = dg.data(); out += `<div class="small">${g.subject}: ${g.grade}</div>`; sum+=parseFloat(g.grade||0); count++; });
+              out += `<div style="margin-top:10px;"><strong>Mesatarja:</strong> ${count? (sum/count).toFixed(2) : '-'}</div>`;
+              out += `<div style="margin-top:10px;"><button onclick="window.print()">Printo</button></div>`;
+              card.innerHTML = out;
+            });
+          });
+        });
+      });
+    });
+  </script>
+</body>
+</html>

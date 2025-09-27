@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="sq">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Lëndët - Mini LMS</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header class="topbar">
+      <div class="brand">Mini-LMS</div>
+      <div>
+        <span id="userBadge">Nuk je kyç</span>
+        <button id="logoutBtn" class="secondary">Dal</button>
+      </div>
+    </header>
+
+    <div class="app-grid">
+      <aside class="sidebar">
+        <a href="dashboard.html">Paneli</a>
+        <a href="profile.html">Profili</a>
+        <a href="courses.html" class="active">Lëndët</a>
+        <a href="schedule.html">Orari</a>
+        <a href="tests.html">Testet</a>
+        <a href="grades.html">Rezultatet</a>
+        <a href="reports.html">Raportet</a>
+      </aside>
+
+      <section class="main">
+        <div class="card">
+          <h1>Lëndët</h1>
+          <p class="small">Lista e lëndëve</p>
+        </div>
+
+        <div id="coursesWrap" class="card">
+          <div class="small">Duke ngarkuar…</div>
+        </div>
+
+        <div id="teacherControls" class="card" style="display:none">
+          <h3>Shto Lëndë</h3>
+          <label>Emri</label>
+          <input type="text" id="m_course_title">
+          <label>Klasa</label>
+          <select id="m_course_class"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select>
+          <div style="margin-top:10px;">
+            <button id="saveCourse">Shto Lëndë</button>
+          </div>
+        </div>
+
+      </section>
+    </div>
+  </div>
+
+  <!-- Firebase v8 -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-analytics.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCXKO1FJ0qbhwltBM15yL2YYIKsqykCf38",
+      authDomain: "mini-lms-b2c43.firebaseapp.com",
+      projectId: "mini-lms-b2c43",
+      storageBucket: "mini-lms-b2c43.firebasestorage.app",
+      messagingSenderId: "15157343523",
+      appId: "1:15157343523:web:bb67b75f8ab47bb47a4896",
+      measurementId: "G-JKL3SBEQ88"
+    };
+    firebase.initializeApp(firebaseConfig);
+    firebase.analytics();
+    window.auth = firebase.auth();
+    window.db = firebase.firestore();
+  </script>
+
+  <script src="app1.js"></script>
+
+  <script>
+    auth.onAuthStateChanged(user=>{
+      if(!user) return window.location.href='index.html';
+      db.collection('users').doc(user.uid).get().then(doc=>{
+        const u = doc.data();
+        if(!u) return;
+        const wrap = document.getElementById('coursesWrap');
+
+        if(u.role==='teacher'){
+          document.getElementById('teacherControls').style.display='block';
+          // add course
+          document.getElementById('saveCourse').addEventListener('click', async ()=>{
+            const title = document.getElementById('m_course_title').value.trim();
+            const cls = parseInt(document.getElementById('m_course_class').value);
+            if(!title) return alert('Shkruaj emrin e lëndës');
+            await db.collection('courses').add({title, classes:[cls], teacherId:user.uid, createdAt:new Date()});
+            document.getElementById('m_course_title').value='';
+          });
+
+          db.collection('courses').where('teacherId','==',user.uid).onSnapshot(s=>{
+            if(s.empty) wrap.innerHTML = '<div class="small muted">Nuk ka lëndë.</div>';
+            else {
+              let html='';
+              s.forEach(d=>{
+                const c = d.data();
+                html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                  <div><strong>${c.title}</strong><div class="small">Klasa: ${ (c.classes||[]).join(',') }</div></div>
+                  <div><button data-id="${d.id}" class="delCourseBtn secondary">Fshi</button></div>
+                </div>`;
+              });
+              wrap.innerHTML = html;
+              // attach delete handlers
+              document.querySelectorAll('.delCourseBtn').forEach(b=>{
+                b.addEventListener('click', async ()=>{
+                  if(!confirm('Fshi lëndën?')) return;
+                  const id = b.dataset.id;
+                  await db.collection('courses').doc(id).delete();
+                });
+              });
+            }
+          });
+        } else {
+          // student view
+          db.collection('courses').where('classes','array-contains',u.classNum).onSnapshot(s=>{
+            if(s.empty) wrap.innerHTML = '<div class="small muted">Nuk ka lëndë për klasën tënde.</div>';
+            else {
+              let html='';
+              s.forEach(d=>{
+                const c = d.data();
+                html += `<div style="margin-bottom:8px"><strong>${c.title}</strong><div class="small">Klasa: ${ (c.classes||[]).join(',') }</div></div>`;
+              });
+              wrap.innerHTML = html;
+            }
+          });
+        }
+      });
+    });
+  </script>
+</body>
+</html>

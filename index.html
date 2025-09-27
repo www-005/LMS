@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="sq">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mini LMS - Hyrje</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="auth-page">
+  <div class="auth-card card">
+    <h2 style="margin-bottom:16px;">Kyçu / Regjistrohu</h2>
+
+    <form id="authForm" class="form" onsubmit="return false;">
+      <label for="roleSelect">Roli</label>
+      <select id="roleSelect" required>
+        <option value="student">Nxënës</option>
+        <option value="teacher">Mësues</option>
+      </select>
+
+      <label for="nameInput">Emri</label>
+      <input type="text" id="nameInput" placeholder="Emri i plotë" required>
+
+      <label for="emailInput">Email</label>
+      <input type="email" id="emailInput" placeholder="email@example.com" required>
+
+      <label for="passInput">Fjalëkalimi</label>
+      <input type="password" id="passInput" placeholder="********" required>
+
+      <div id="studentFields">
+        <label for="classNum">Klasa (1–9)</label>
+        <select id="classNum">
+          <option>1</option><option>2</option><option>3</option>
+          <option>4</option><option>5</option><option>6</option>
+          <option>7</option><option>8</option><option>9</option>
+        </select>
+      </div>
+
+      <div id="teacherFields" style="display:none">
+        <label for="classList">Kujdestar i klasave</label>
+        <select id="classList" multiple>
+          <option>1</option><option>2</option><option>3</option>
+          <option>4</option><option>5</option><option>6</option>
+          <option>7</option><option>8</option><option>9</option>
+        </select>
+        <small>Mund të zgjedhësh më shumë se një klasë (Ctrl/Shift).</small>
+      </div>
+
+      <div class="form-row" style="margin-top:12px;">
+        <button type="button" id="registerBtn">Regjistrohu</button>
+        <button type="button" class="secondary" id="loginBtn">Kyçu</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Firebase v8 SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-analytics.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCXKO1FJ0qbhwltBM15yL2YYIKsqykCf38",
+      authDomain: "mini-lms-b2c43.firebaseapp.com",
+      projectId: "mini-lms-b2c43",
+      storageBucket: "mini-lms-b2c43.firebasestorage.app",
+      messagingSenderId: "15157343523",
+      appId: "1:15157343523:web:bb67b75f8ab47bb47a4896",
+      measurementId: "G-JKL3SBEQ88"
+    };
+    firebase.initializeApp(firebaseConfig);
+    firebase.analytics();
+    window.auth = firebase.auth();
+    window.db = firebase.firestore();
+  </script>
+
+  <script>
+    // toggle fields for role
+    document.getElementById('roleSelect').addEventListener('change', function(){
+      const v = this.value;
+      document.getElementById('studentFields').style.display = v==='student' ? 'block' : 'none';
+      document.getElementById('teacherFields').style.display = v==='teacher' ? 'block' : 'none';
+    });
+  </script>
+
+  <script src="app1.js"></script>
+</body>
+</html>

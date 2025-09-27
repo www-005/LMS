@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="sq">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Testet - Mini LMS</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header class="topbar">
+      <div class="brand">Mini-LMS</div>
+      <div>
+        <span id="userBadge">Nuk je kyç</span>
+        <button id="logoutBtn" class="secondary">Dal</button>
+      </div>
+    </header>
+
+    <div class="app-grid">
+      <aside class="sidebar">
+        <a href="dashboard.html">Paneli</a>
+        <a href="profile.html">Profili</a>
+        <a href="courses.html">Lëndët</a>
+        <a href="schedule.html">Orari</a>
+        <a href="tests.html" class="active">Testet</a>
+        <a href="grades.html">Rezultatet</a>
+        <a href="reports.html">Raportet</a>
+      </aside>
+
+      <section class="main">
+        <div class="card">
+          <h1>Testet</h1>
+        </div>
+
+        <div id="testsWrap" class="card">Duke ngarkuar…</div>
+
+        <div id="teacherTests" class="card" style="display:none">
+          <h3>Shto Test</h3>
+          <label>Lënda</label><input type="text" id="testSubject" placeholder="Shqip">
+          <label>Data</label><input type="date" id="testDate">
+          <label>Klasa</label>
+          <select id="testClass"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select>
+          <div style="margin-top:10px;"><button id="addTestBtn">Shto Test</button></div>
+        </div>
+
+      </section>
+    </div>
+  </div>
+
+  <!-- Firebase v8 -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-analytics.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCXKO1FJ0qbhwltBM15yL2YYIKsqykCf38",
+      authDomain: "mini-lms-b2c43.firebaseapp.com",
+      projectId: "mini-lms-b2c43",
+      storageBucket: "mini-lms-b2c43.firebasestorage.app",
+      messagingSenderId: "15157343523",
+      appId: "1:15157343523:web:bb67b75f8ab47bb47a4896",
+      measurementId: "G-JKL3SBEQ88"
+    };
+    firebase.initializeApp(firebaseConfig);
+    firebase.analytics();
+    window.auth = firebase.auth();
+    window.db = firebase.firestore();
+  </script>
+
+  <script src="app1.js"></script>
+
+  <script>
+    auth.onAuthStateChanged(user=>{
+      if(!user) return window.location.href='index.html';
+      db.collection('users').doc(user.uid).get().then(doc=>{
+        const u = doc.data();
+        const wrap = document.getElementById('testsWrap');
+
+        if(u.role==='teacher'){
+          document.getElementById('teacherTests').style.display='block';
+          document.getElementById('addTestBtn').addEventListener('click', async ()=>{
+            const s = document.getElementById('testSubject').value.trim();
+            const d = document.getElementById('testDate').value;
+            const cl = parseInt(document.getElementById('testClass').value);
+            if(!s||!d) return alert('Plotëso fushat');
+            await db.collection('tests').add({subject:s,date:d,classes:[cl],teacherId:user.uid,createdAt:new Date()});
+            document.getElementById('testSubject').value=''; document.getElementById('testDate').value='';
+          });
+
+          db.collection('tests').where('teacherId','==',user.uid).onSnapshot(s=>{
+            if(s.empty) wrap.innerHTML = '<div class="small muted">Nuk ka teste.</div>';
+            else {
+              let html=''; s.forEach(d=>{ const t=d.data(); html += `<div style="margin-bottom:8px;"><strong>${t.date}</strong><div class="small">${t.subject} — Klasa: ${ (t.classes||[]).join(',') }</div></div>` });
+              wrap.innerHTML = html;
+            }
+          });
+        } else {
+          db.collection('tests').where('classes','array-contains',u.classNum).onSnapshot(s=>{
+            if(s.empty) wrap.innerHTML = '<div class="small muted">Nuk ka teste për klasën tënde.</div>';
+            else {
+              let html=''; s.forEach(d=>{ const t=d.data(); html += `<div style="margin-bottom:8px;"><strong>${t.date}</strong><div class="small">${t.subject}</div></div>` });
+              wrap.innerHTML = html;
+            }
+          });
+        }
+      });
+    });
+  </script>
+</body>
+</html>

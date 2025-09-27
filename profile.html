@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="sq">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Profili - Mini LMS</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header class="topbar">
+      <div class="brand">Mini-LMS</div>
+      <div>
+        <span id="userBadge">Nuk je kyç</span>
+        <button id="logoutBtn" class="secondary">Dal</button>
+      </div>
+    </header>
+
+    <div class="app-grid">
+      <aside class="sidebar">
+        <a href="dashboard.html">Paneli</a>
+        <a href="profile.html" class="active">Profili</a>
+        <a href="courses.html">Lëndët</a>
+        <a href="schedule.html">Orari</a>
+        <a href="tests.html">Testet</a>
+        <a href="grades.html">Rezultatet</a>
+        <a href="reports.html">Raportet</a>
+      </aside>
+
+      <section class="main">
+        <div class="card">
+          <h1>Profili</h1>
+        </div>
+
+        <div class="card">
+          <strong id="pName">Emri Mbiemri</strong>
+          <p id="pRole">Roli</p>
+          <p id="pClass">Klasa: -</p>
+        </div>
+
+        <div id="profileDetailsWrap" class="card small">
+          <!-- notat / info -->
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Firebase v8 -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-analytics.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCXKO1FJ0qbhwltBM15yL2YYIKsqykCf38",
+      authDomain: "mini-lms-b2c43.firebaseapp.com",
+      projectId: "mini-lms-b2c43",
+      storageBucket: "mini-lms-b2c43.firebasestorage.app",
+      messagingSenderId: "15157343523",
+      appId: "1:15157343523:web:bb67b75f8ab47bb47a4896",
+      measurementId: "G-JKL3SBEQ88"
+    };
+    firebase.initializeApp(firebaseConfig);
+    firebase.analytics();
+    window.auth = firebase.auth();
+    window.db = firebase.firestore();
+  </script>
+
+  <script src="app1.js"></script>
+
+  <script>
+    auth.onAuthStateChanged(user=>{
+      if(!user) return window.location.href='index.html';
+      db.collection('users').doc(user.uid).get().then(doc=>{
+        if(!doc.exists) return alert('Profili nuk u gjet');
+        const u = doc.data();
+        document.getElementById('pName').innerText = u.name || user.email;
+        document.getElementById('pRole').innerText = u.role==='teacher' ? 'Mësues' : 'Nxënës';
+        document.getElementById('pClass').innerText = u.role==='student' ? 'Klasa: ' + (u.classNum||'-') : 'Kujdestar i klasave: ' + ((u.classes||[]).join(', ')||'-');
+
+        const details = document.getElementById('profileDetailsWrap');
+        details.innerHTML = '';
+        if(u.role === 'student'){
+          details.innerHTML = '<h3>Notat</h3>';
+          db.collection('grades').where('studentId','==',user.uid).onSnapshot(s=>{
+            details.innerHTML = '<h3>Notat</h3>';
+            s.forEach(d=>{
+              const g = d.data();
+              details.innerHTML += `<div class="card small">${g.subject}: ${g.grade}</div>`;
+            });
+          });
+        } else {
+          details.innerHTML = '<div class="small">Si mësues, përdor menynë për të shtuar lëndë, orar, teste dhe nota.</div>';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

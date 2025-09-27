@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="sq">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Orari - Mini LMS</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header class="topbar">
+      <div class="brand">Mini-LMS</div>
+      <div>
+        <span id="userBadge">Nuk je kyç</span>
+        <button id="logoutBtn" class="secondary">Dal</button>
+      </div>
+    </header>
+
+    <div class="app-grid">
+      <aside class="sidebar">
+        <a href="dashboard.html">Paneli</a>
+        <a href="profile.html">Profili</a>
+        <a href="courses.html">Lëndët</a>
+        <a href="schedule.html" class="active">Orari</a>
+        <a href="tests.html">Testet</a>
+        <a href="grades.html">Rezultatet</a>
+        <a href="reports.html">Raportet</a>
+      </aside>
+
+      <section class="main">
+        <div class="card">
+          <h1>Orari</h1>
+        </div>
+
+        <div id="scheduleWrap" class="card">Duke ngarkuar…</div>
+
+        <div id="teacherSchedForm" class="card" style="display:none">
+          <h3>Shto Orar</h3>
+          <label>Dita</label><input type="text" id="daySched" placeholder="E Hënë">
+          <label>Ora</label><input type="text" id="timeSched" placeholder="08:00">
+          <label>Lënda</label><input type="text" id="subjSched" placeholder="Matematikë">
+          <label>Klasa</label>
+          <select id="classSched"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select>
+          <div style="margin-top:10px;"><button id="addSchedBtn">Shto Orar</button></div>
+        </div>
+
+      </section>
+    </div>
+  </div>
+
+  <!-- Firebase v8 -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-analytics.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCXKO1FJ0qbhwltBM15yL2YYIKsqykCf38",
+      authDomain: "mini-lms-b2c43.firebaseapp.com",
+      projectId: "mini-lms-b2c43",
+      storageBucket: "mini-lms-b2c43.firebasestorage.app",
+      messagingSenderId: "15157343523",
+      appId: "1:15157343523:web:bb67b75f8ab47bb47a4896",
+      measurementId: "G-JKL3SBEQ88"
+    };
+    firebase.initializeApp(firebaseConfig);
+    firebase.analytics();
+    window.auth = firebase.auth();
+    window.db = firebase.firestore();
+  </script>
+
+  <script src="app1.js"></script>
+
+  <script>
+    auth.onAuthStateChanged(user=>{
+      if(!user) return window.location.href='index.html';
+      db.collection('users').doc(user.uid).get().then(doc=>{
+        const u = doc.data();
+        const wrap = document.getElementById('scheduleWrap');
+
+        if(u.role==='teacher'){
+          document.getElementById('teacherSchedForm').style.display='block';
+          document.getElementById('addSchedBtn').addEventListener('click', async ()=>{
+            const day = document.getElementById('daySched').value.trim();
+            const time = document.getElementById('timeSched').value.trim();
+            const subj = document.getElementById('subjSched').value.trim();
+            const cl = parseInt(document.getElementById('classSched').value);
+            if(!day||!time||!subj) return alert('Plotëso fushat');
+            await db.collection('schedule').add({day,time,subject:subj,classes:[cl],teacherId:user.uid,createdAt:new Date()});
+            document.getElementById('daySched').value=''; document.getElementById('timeSched').value=''; document.getElementById('subjSched').value='';
+          });
+
+          db.collection('schedule').where('teacherId','==',user.uid).onSnapshot(s=>{
+            if(s.empty) wrap.innerHTML = '<div class="small muted">Nuk ka orar të vendosur.</div>';
+            else {
+              let html='';
+              s.forEach(d=>{ const o=d.data();
+                html += `<div style="margin-bottom:8px;"><strong>${o.day} ${o.time}</strong><div class="small">${o.subject} — Klasa: ${ (o.classes||[]).join(',') }</div></div>`;
+              });
+              wrap.innerHTML = html;
+            }
+          });
+
+        } else {
+          db.collection('schedule').where('classes','array-contains',u.classNum).onSnapshot(s=>{
+            if(s.empty) wrap.innerHTML = '<div class="small muted">Nuk ka orar për klasën tënde.</div>';
+            else {
+              let html='';
+              s.forEach(d=>{ const o=d.data();
+                html += `<div style="margin-bottom:8px;"><strong>${o.day} ${o.time}</strong><div class="small">${o.subject}</div></div>`;
+              });
+              wrap.innerHTML = html;
+            }
+          });
+        }
+      });
+    });
+  </script>
+</body>
+</html>

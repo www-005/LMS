@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="sq">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Notat - Mini LMS</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header class="topbar">
+      <div class="brand">Mini-LMS</div>
+      <div>
+        <span id="userBadge">Nuk je kyç</span>
+        <button id="logoutBtn" class="secondary">Dal</button>
+      </div>
+    </header>
+
+    <div class="app-grid">
+      <aside class="sidebar">
+        <a href="dashboard.html">Paneli</a>
+        <a href="profile.html">Profili</a>
+        <a href="courses.html">Lëndët</a>
+        <a href="schedule.html">Orari</a>
+        <a href="tests.html">Testet</a>
+        <a href="grades.html" class="active">Rezultatet</a>
+        <a href="reports.html">Raportet</a>
+      </aside>
+
+      <section class="main">
+        <div class="card">
+          <h1>Notat</h1>
+        </div>
+
+        <div id="gradesWrap" class="card">Duke ngarkuar…</div>
+
+        <div id="teacherGrades" class="card" style="display:none">
+          <h3>Vendos Notë</h3>
+          <label>Email i nxënësit</label><input type="email" id="studentEmail" placeholder="nxenes@shkolla.com">
+          <label>Lënda</label><input type="text" id="subjectGrade" placeholder="Matematikë">
+          <label>Nota</label><input type="number" id="gradeValue" min="1" max="10" placeholder="Nota">
+          <div style="margin-top:10px;"><button id="addGradeBtn">Shto Notë</button></div>
+        </div>
+
+      </section>
+    </div>
+  </div>
+
+  <!-- Firebase v8 -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-analytics.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCXKO1FJ0qbhwltBM15yL2YYIKsqykCf38",
+      authDomain: "mini-lms-b2c43.firebaseapp.com",
+      projectId: "mini-lms-b2c43",
+      storageBucket: "mini-lms-b2c43.firebasestorage.app",
+      messagingSenderId: "15157343523",
+      appId: "1:15157343523:web:bb67b75f8ab47bb47a4896",
+      measurementId: "G-JKL3SBEQ88"
+    };
+    firebase.initializeApp(firebaseConfig);
+    firebase.analytics();
+    window.auth = firebase.auth();
+    window.db = firebase.firestore();
+  </script>
+
+  <script src="app1.js"></script>
+
+  <script>
+    auth.onAuthStateChanged(user=>{
+      if(!user) return window.location.href='index.html';
+      db.collection('users').doc(user.uid).get().then(doc=>{
+        const u = doc.data();
+        const wrap = document.getElementById('gradesWrap');
+
+        if(u.role==='teacher'){
+          document.getElementById('teacherGrades').style.display='block';
+          document.getElementById('addGradeBtn').addEventListener('click', async ()=>{
+            const email = document.getElementById('studentEmail').value.trim();
+            const subj = document.getElementById('subjectGrade').value.trim();
+            const grade = parseFloat(document.getElementById('gradeValue').value);
+            if(!email||!subj||!grade) return alert('Plotëso fushat');
+            const q = await db.collection('users').where('email','==',email).get();
+            if(q.empty) return alert('Nxënësi nuk u gjet');
+            const studentId = q.docs[0].id;
+            await db.collection('grades').add({studentId,studentEmail:email,subject:subj,grade,teacherId:user.uid,createdAt:new Date()});
+            alert('Nota u shtua');
+          });
+
+          db.collection('grades').where('teacherId','==',user.uid).onSnapshot(s=>{
+            if(s.empty) wrap.innerHTML = '<div class="small muted">Nuk ka nota të vendosura.</div>';
+            else {
+              let html=''; s.forEach(d=>{ const g=d.data(); html += `<div style="margin-bottom:8px;"><strong>${g.studentEmail}</strong><div class="small">${g.subject}: ${g.grade}</div></div>` });
+              wrap.innerHTML = html;
+            }
+          });
+        } else {
+          db.collection('grades').where('studentId','==',user.uid).onSnapshot(s=>{
+            if(s.empty) wrap.innerHTML = '<div class="small muted">Nuk ka nota për ju.</div>';
+            else {
+              let html=''; s.forEach(d=>{ const g=d.data(); html += `<div style="margin-bottom:8px;"><strong>${g.subject}</strong><div class="small">Nota: ${g.grade}</div></div>` });
+              wrap.innerHTML = html;
+            }
+          });
+        }
+      });
+    });
+  </script>
+</body>
+</html>

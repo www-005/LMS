@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="sq">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Paneli - Mini LMS</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header class="topbar">
+      <div class="brand">Mini-LMS</div>
+      <div>
+        <span id="userBadge">Nuk je kyç</span>
+        <button id="logoutBtn" class="secondary">Dal</button>
+      </div>
+    </header>
+
+    <div class="app-grid">
+      <aside class="sidebar">
+        <a href="dashboard.html" class="active">Paneli</a>
+        <a href="profile.html">Profili</a>
+        <a href="courses.html">Lëndët</a>
+        <a href="schedule.html">Orari</a>
+        <a href="tests.html">Testet</a>
+        <a href="grades.html">Rezultatet</a>
+        <a href="reports.html">Raportet</a>
+      </aside>
+
+      <section class="main">
+        <div class="card">
+          <h1>Paneli</h1>
+          <p class="small">Përmbledhje e shpejtë</p>
+        </div>
+
+        <div class="grid-4">
+          <div class="card stat-card stat-blue"><h3 id="statCourses">0</h3><p>Lëndët e regjistruara</p></div>
+          <div class="card stat-card stat-green"><h3 id="statPassed">0</h3><p>Lëndët e kaluara</p></div>
+          <div class="card stat-card stat-amber"><h3 id="statSchedule">0</h3><p>Orari</p></div>
+          <div class="card stat-card stat-red"><h3 id="statAvg">-</h3><p>Nota mesatare</p></div>
+        </div>
+
+        <div class="card">
+          <h3>Udhëzime të shpejta</h3>
+          <p class="small">Përdor menynë për të shkuar në faqet: shto lëndë, orar, teste dhe nota.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Firebase v8 SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-analytics.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCXKO1FJ0qbhwltBM15yL2YYIKsqykCf38",
+      authDomain: "mini-lms-b2c43.firebaseapp.com",
+      projectId: "mini-lms-b2c43",
+      storageBucket: "mini-lms-b2c43.firebasestorage.app",
+      messagingSenderId: "15157343523",
+      appId: "1:15157343523:web:bb67b75f8ab47bb47a4896",
+      measurementId: "G-JKL3SBEQ88"
+    };
+    firebase.initializeApp(firebaseConfig);
+    firebase.analytics();
+    window.auth = firebase.auth();
+    window.db = firebase.firestore();
+  </script>
+
+  <script src="app1.js"></script>
+
+  <script>
+    auth.onAuthStateChanged(user=>{
+      if(!user) return window.location.href='index.html';
+      db.collection('users').doc(user.uid).get().then(doc=>{
+        const u = doc.data();
+        if(!u) return;
+        if(u.role==='teacher'){
+          db.collection('courses').where('teacherId','==',user.uid).onSnapshot(s=>{
+            document.getElementById('statCourses').innerText = s.size;
+          });
+          document.getElementById('statPassed').innerText = '-';
+          db.collection('schedule').where('teacherId','==',user.uid).onSnapshot(s=>{
+            document.getElementById('statSchedule').innerText = s.size;
+          });
+          db.collection('grades').where('teacherId','==',user.uid).onSnapshot(s=>{
+            let sum=0,count=0;
+            s.forEach(d=>{ sum += parseFloat(d.data().grade||0); count++; });
+            document.getElementById('statAvg').innerText = count ? (sum/count).toFixed(1) : '-';
+          });
+        } else {
+          // student
+          db.collection('courses').where('classes','array-contains',u.classNum).onSnapshot(s=>{
+            document.getElementById('statCourses').innerText = s.size;
+          });
+          db.collection('schedule').where('classes','array-contains',u.classNum).onSnapshot(s=>{
+            document.getElementById('statSchedule').innerText = s.size;
+          });
+          db.collection('grades').where('studentId','==',user.uid).onSnapshot(s=>{
+            let passed=0,sum=0,count=0;
+            s.forEach(d=>{ const g=parseFloat(d.data().grade||0); if(g>=5) passed++; sum+=g; count++; });
+            document.getElementById('statPassed').innerText = passed;
+            document.getElementById('statAvg').innerText = count ? (sum/count).toFixed(1) : '-';
+          });
+        }
+      });
+    });
+  </script>
+</body>
+</html>
