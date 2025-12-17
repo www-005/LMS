@@ -76,33 +76,58 @@
       db.collection('users').doc(user.uid).get().then(doc=>{
         const u = doc.data();
         const wrap = document.getElementById('gradesWrap');
+        const addBtn = document.getElementById('addGradeBtn');
 
         if(u.role==='teacher'){
           document.getElementById('teacherGrades').style.display='block';
-          document.getElementById('addGradeBtn').addEventListener('click', async ()=>{
-            const email = document.getElementById('studentEmail').value.trim();
-            const subj = document.getElementById('subjectGrade').value.trim();
-            const grade = parseFloat(document.getElementById('gradeValue').value);
-            if(!email||!subj||!grade) return alert('Plotëso fushat');
-            const q = await db.collection('users').where('email','==',email).get();
-            if(q.empty) return alert('Nxënësi nuk u gjet');
-            const studentId = q.docs[0].id;
-            await db.collection('grades').add({studentId,studentEmail:email,subject:subj,grade,teacherId:user.uid,createdAt:new Date()});
-            alert('Nota u shtua');
-          });
+
+          // add grade (prevent duplicate listener)
+          if(addBtn && !addBtn.dataset.listener){
+            addBtn.addEventListener('click', async ()=>{
+              const email = document.getElementById('studentEmail').value.trim();
+              const subj = document.getElementById('subjectGrade').value.trim();
+              const grade = parseFloat(document.getElementById('gradeValue').value);
+              if(!email||!subj||!grade) return alert('Plotëso fushat');
+
+              const q = await db.collection('users').where('email','==',email).get();
+              if(q.empty) return alert('Nxënësi nuk u gjet');
+              const studentId = q.docs[0].id;
+
+              await db.collection('grades').add({
+                studentId,
+                studentEmail: email,
+                subject: subj,
+                grade,
+                teacherId: user.uid,
+                createdAt: new Date()
+              });
+
+              alert('Nota u shtua');
+            });
+            addBtn.dataset.listener = "true";
+          }
 
           db.collection('grades').where('teacherId','==',user.uid).onSnapshot(s=>{
             if(s.empty) wrap.innerHTML = '<div class="small muted">Nuk ka nota të vendosura.</div>';
             else {
-              let html=''; s.forEach(d=>{ const g=d.data(); html += `<div style="margin-bottom:8px;"><strong>${g.studentEmail}</strong><div class="small">${g.subject}: ${g.grade}</div></div>` });
+              let html=''; 
+              s.forEach(d=>{
+                const g = d.data();
+                html += `<div style="margin-bottom:8px;"><strong>${g.studentEmail}</strong><div class="small">${g.subject}: ${g.grade}</div></div>`;
+              });
               wrap.innerHTML = html;
             }
           });
+
         } else {
           db.collection('grades').where('studentId','==',user.uid).onSnapshot(s=>{
             if(s.empty) wrap.innerHTML = '<div class="small muted">Nuk ka nota për ju.</div>';
             else {
-              let html=''; s.forEach(d=>{ const g=d.data(); html += `<div style="margin-bottom:8px;"><strong>${g.subject}</strong><div class="small">Nota: ${g.grade}</div></div>` });
+              let html=''; 
+              s.forEach(d=>{
+                const g = d.data();
+                html += `<div style="margin-bottom:8px;"><strong>${g.subject}</strong><div class="small">Nota: ${g.grade}</div></div>`;
+              });
               wrap.innerHTML = html;
             }
           });
