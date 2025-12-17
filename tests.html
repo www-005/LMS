@@ -39,7 +39,10 @@
           <label>Lënda</label><input type="text" id="testSubject" placeholder="Shqip">
           <label>Data</label><input type="date" id="testDate">
           <label>Klasa</label>
-          <select id="testClass"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select>
+          <select id="testClass">
+            <option>1</option><option>2</option><option>3</option><option>4</option>
+            <option>5</option><option>6</option><option>7</option><option>8</option><option>9</option>
+          </select>
           <div style="margin-top:10px;"><button id="addTestBtn">Shto Test</button></div>
         </div>
 
@@ -77,30 +80,68 @@
       db.collection('users').doc(user.uid).get().then(doc=>{
         const u = doc.data();
         const wrap = document.getElementById('testsWrap');
+        const addBtn = document.getElementById('addTestBtn');
 
         if(u.role==='teacher'){
           document.getElementById('teacherTests').style.display='block';
-          document.getElementById('addTestBtn').addEventListener('click', async ()=>{
-            const s = document.getElementById('testSubject').value.trim();
-            const d = document.getElementById('testDate').value;
-            const cl = parseInt(document.getElementById('testClass').value);
-            if(!s||!d) return alert('Plotëso fushat');
-            await db.collection('tests').add({subject:s,date:d,classes:[cl],teacherId:user.uid,createdAt:new Date()});
-            document.getElementById('testSubject').value=''; document.getElementById('testDate').value='';
-          });
 
+          // Shto Test (një herë listener)
+          if(addBtn && !addBtn.dataset.listener){
+            addBtn.addEventListener('click', async ()=>{
+              const s = document.getElementById('testSubject').value.trim();
+              const d = document.getElementById('testDate').value;
+              const cl = parseInt(document.getElementById('testClass').value);
+              if(!s || !d) return alert('Plotëso fushat');
+
+              await db.collection('tests').add({
+                subject: s,
+                date: d,
+                classes: [cl],
+                teacherId: user.uid,
+                createdAt: new Date()
+              });
+
+              document.getElementById('testSubject').value='';
+              document.getElementById('testDate').value='';
+            });
+            addBtn.dataset.listener = "true";
+          }
+
+          // Ngarko testet e mësuesit
           db.collection('tests').where('teacherId','==',user.uid).onSnapshot(s=>{
             if(s.empty) wrap.innerHTML = '<div class="small muted">Nuk ka teste.</div>';
             else {
-              let html=''; s.forEach(d=>{ const t=d.data(); html += `<div style="margin-bottom:8px;"><strong>${t.date}</strong><div class="small">${t.subject} — Klasa: ${ (t.classes||[]).join(',') }</div></div>` });
+              let html='';
+              s.forEach(d=>{
+                const t = d.data();
+                html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                  <div><strong>${t.date}</strong><div class="small">${t.subject} — Klasa: ${(t.classes||[]).join(',')}</div></div>
+                  <div><button data-id="${d.id}" class="delTestBtn secondary">Fshi</button></div>
+                </div>`;
+              });
               wrap.innerHTML = html;
+
+              // Attach delete buttons
+              document.querySelectorAll('.delTestBtn').forEach(b=>{
+                b.addEventListener('click', async ()=>{
+                  if(!confirm('Fshi testin?')) return;
+                  const id = b.dataset.id;
+                  await db.collection('tests').doc(id).delete();
+                });
+              });
             }
           });
+
         } else {
+          // student view
           db.collection('tests').where('classes','array-contains',u.classNum).onSnapshot(s=>{
             if(s.empty) wrap.innerHTML = '<div class="small muted">Nuk ka teste për klasën tënde.</div>';
             else {
-              let html=''; s.forEach(d=>{ const t=d.data(); html += `<div style="margin-bottom:8px;"><strong>${t.date}</strong><div class="small">${t.subject}</div></div>` });
+              let html='';
+              s.forEach(d=>{
+                const t = d.data();
+                html += `<div style="margin-bottom:8px;"><strong>${t.date}</strong><div class="small">${t.subject}</div></div>`;
+              });
               wrap.innerHTML = html;
             }
           });
