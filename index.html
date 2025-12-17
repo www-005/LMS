@@ -81,6 +81,15 @@
       document.getElementById('studentFields').style.display = v==='student' ? 'block' : 'none';
       document.getElementById('teacherFields').style.display = v==='teacher' ? 'block' : 'none';
     });
+
+    // kontrollo në login/register në index.html
+    auth.onAuthStateChanged(async user => {
+      if(user) {
+        // Nëse është kyçur, ridrejto te dashboard
+        window.location.href = 'dashboard.html';
+      }
+      // nëse nuk ka user, bëhet thjesht shfaqja e form-it, nuk ka ridrejtim pafund
+    });
   </script>
 
   <script src="app1.js"></script>
