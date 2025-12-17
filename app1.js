@@ -14,7 +14,9 @@ const registerBtn = document.getElementById('registerBtn');
 const loginBtn = document.getElementById('loginBtn');
 
 if(registerBtn){
-  registerBtn.addEventListener('click', async () => {
+  registerBtn.addEventListener('click', async (e) => {
+    e.preventDefault(); // PREVENT loop automatik
+
     const role = document.getElementById('roleSelect').value;
     const name = document.getElementById('nameInput').value.trim();
     const email = document.getElementById('emailInput').value.trim();
@@ -36,7 +38,7 @@ if(registerBtn){
 
       await db.collection('users').doc(user.uid).set(data);
       alert('Regjistrimi u krye me sukses!');
-      window.location.href = 'dashboard.html';
+      window.location.href = 'dashboard.html'; // redirect vetëm pas suksesit
     } catch(e){
       console.error(e);
       alert(e.message);
@@ -45,20 +47,22 @@ if(registerBtn){
 }
 
 if(loginBtn){
-  loginBtn.addEventListener('click', async () => {
+  loginBtn.addEventListener('click', async (e) => {
+    e.preventDefault(); // PREVENT loop automatik
     const email = document.getElementById('emailInput').value.trim();
     const pass = document.getElementById('passInput').value.trim();
     if(!email || !pass) return alert('Plotëso email dhe fjalëkalim');
 
     try {
       await auth.signInWithEmailAndPassword(email, pass);
-      window.location.href = 'dashboard.html';
+      window.location.href = 'dashboard.html'; // redirect vetëm pas suksesit
     } catch(e){
       console.error(e);
       alert(e.message);
     }
   });
 }
+
 
 // Update user badge
 auth.onAuthStateChanged(user => {
@@ -326,3 +330,4 @@ if(document.getElementById('pName')){
     }
   });
 }
+
