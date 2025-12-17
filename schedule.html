@@ -40,7 +40,10 @@
           <label>Ora</label><input type="text" id="timeSched" placeholder="08:00">
           <label>Lënda</label><input type="text" id="subjSched" placeholder="Matematikë">
           <label>Klasa</label>
-          <select id="classSched"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select>
+          <select id="classSched">
+            <option>1</option><option>2</option><option>3</option><option>4</option>
+            <option>5</option><option>6</option><option>7</option><option>8</option><option>9</option>
+          </select>
           <div style="margin-top:10px;"><button id="addSchedBtn">Shto Orar</button></div>
         </div>
 
@@ -78,36 +81,70 @@
       db.collection('users').doc(user.uid).get().then(doc=>{
         const u = doc.data();
         const wrap = document.getElementById('scheduleWrap');
+        const addBtn = document.getElementById('addSchedBtn');
 
         if(u.role==='teacher'){
           document.getElementById('teacherSchedForm').style.display='block';
-          document.getElementById('addSchedBtn').addEventListener('click', async ()=>{
-            const day = document.getElementById('daySched').value.trim();
-            const time = document.getElementById('timeSched').value.trim();
-            const subj = document.getElementById('subjSched').value.trim();
-            const cl = parseInt(document.getElementById('classSched').value);
-            if(!day||!time||!subj) return alert('Plotëso fushat');
-            await db.collection('schedule').add({day,time,subject:subj,classes:[cl],teacherId:user.uid,createdAt:new Date()});
-            document.getElementById('daySched').value=''; document.getElementById('timeSched').value=''; document.getElementById('subjSched').value='';
-          });
 
+          // Shto Orar (një herë listener)
+          if(addBtn && !addBtn.dataset.listener){
+            addBtn.addEventListener('click', async ()=>{
+              const day = document.getElementById('daySched').value.trim();
+              const time = document.getElementById('timeSched').value.trim();
+              const subj = document.getElementById('subjSched').value.trim();
+              const cl = parseInt(document.getElementById('classSched').value);
+              if(!day||!time||!subj) return alert('Plotëso fushat');
+
+              await db.collection('schedule').add({
+                day,
+                time,
+                subject: subj,
+                classes: [cl],
+                teacherId: user.uid,
+                createdAt: new Date()
+              });
+
+              // Clear input fields
+              document.getElementById('daySched').value='';
+              document.getElementById('timeSched').value='';
+              document.getElementById('subjSched').value='';
+            });
+            addBtn.dataset.listener = "true";
+          }
+
+          // Ngarko oraret e mësuesit
           db.collection('schedule').where('teacherId','==',user.uid).onSnapshot(s=>{
             if(s.empty) wrap.innerHTML = '<div class="small muted">Nuk ka orar të vendosur.</div>';
             else {
               let html='';
-              s.forEach(d=>{ const o=d.data();
-                html += `<div style="margin-bottom:8px;"><strong>${o.day} ${o.time}</strong><div class="small">${o.subject} — Klasa: ${ (o.classes||[]).join(',') }</div></div>`;
+              s.forEach(d=>{
+                const o = d.data();
+                html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                  <div><strong>${o.day} ${o.time}</strong><div class="small">${o.subject} — Klasa: ${(o.classes||[]).join(',')}</div></div>
+                  <div><button data-id="${d.id}" class="delSchedBtn secondary">Fshi</button></div>
+                </div>`;
               });
               wrap.innerHTML = html;
+
+              // Attach delete buttons
+              document.querySelectorAll('.delSchedBtn').forEach(b=>{
+                b.addEventListener('click', async ()=>{
+                  if(!confirm('Fshi orarin?')) return;
+                  const id = b.dataset.id;
+                  await db.collection('schedule').doc(id).delete();
+                });
+              });
             }
           });
 
         } else {
+          // student view
           db.collection('schedule').where('classes','array-contains',u.classNum).onSnapshot(s=>{
             if(s.empty) wrap.innerHTML = '<div class="small muted">Nuk ka orar për klasën tënde.</div>';
             else {
               let html='';
-              s.forEach(d=>{ const o=d.data();
+              s.forEach(d=>{
+                const o = d.data();
                 html += `<div style="margin-bottom:8px;"><strong>${o.day} ${o.time}</strong><div class="small">${o.subject}</div></div>`;
               });
               wrap.innerHTML = html;
