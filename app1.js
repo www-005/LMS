@@ -1,199 +1,90 @@
-// app1.js - Mini-LMS Firebase v8
-window.auth = window.auth || firebase.auth();
-window.db = window.db || firebase.firestore();
+/* app.js - shared logic for Mini-LMS (Firebase v8 expected, auth & db global) */
 
-// logout
-document.getElementById('logoutBtn')?.addEventListener('click', ()=>{
-  auth.signOut().then(()=>window.location.href='index.html');
-});
+function safeGet(id){ return document.getElementById(id); }
 
-// User badge
-auth.onAuthStateChanged(async user=>{
-  if(!user){
-    document.getElementById('userBadge')?.innerText = 'Nuk je kyç';
-    return;
-  }
-  document.getElementById('userBadge')?.innerText = user.email;
+/* Protect page: redirect to index if not logged */
+function protect() {
+  if (typeof auth==='undefined') return console.warn('auth not initialized yet');
+  auth.onAuthStateChanged(user => {
+    if(!user) window.location.href = 'index.html';
+  });
+}
 
-  const doc = await db.collection('users').doc(user.uid).get();
-  if(!doc.exists) return alert('Profili nuk u gjet');
-  const u = doc.data();
+/* Logout handler attach (if button present) */
+(function attachLogout(){
+  const btn = safeGet('logoutBtn');
+  if(!btn) return;
+  btn.addEventListener('click', async ()=>{
+    if(typeof auth==='undefined') return alert('Auth nuk është gati');
+    try {
+      await auth.signOut();
+      window.location.href = 'index.html';
+    } catch(err){ alert('Gabim gjatë daljes: ' + err.message); }
+  });
+})();
 
-  // Ensure classes is always array
-  if(u.role==='teacher' && !Array.isArray(u.classes)) u.classes=[];
+/* Badge display */
+(function attachBadge(){
+  const b = safeGet('userBadge');
+  if(!b) return;
+  if(typeof auth==='undefined') return console.warn('auth not ready for badge');
+  auth.onAuthStateChanged(async user=>{
+    if(!user){ b.innerText = 'Nuk je kyç'; return; }
+    try {
+      const doc = await db.collection('users').doc(user.uid).get();
+      if(doc.exists){
+        const u = doc.data();
+        b.innerText = (u.name || user.email) + ' (' + (u.role==='teacher' ? 'Mësues' : 'Nxënës') + ')';
+      } else {
+        b.innerText = user.email;
+      }
+    } catch(e){ b.innerText = user.email; }
+  });
+})();
 
-  // --- COURSES ---
-  const coursesWrap = document.getElementById('coursesWrap');
-  if(coursesWrap){
-    if(u.role==='teacher'){
-      document.getElementById('teacherControls')?.style.display='block';
-      document.getElementById('saveCourse')?.addEventListener('click', async ()=>{
-        const title = document.getElementById('m_course_title').value.trim();
-        const cls = parseInt(document.getElementById('m_course_class').value);
-        if(!title) return alert('Shkruaj emrin e lëndës');
-        await db.collection('courses').add({title, classes:[cls], teacherId:user.uid, createdAt:new Date()});
-        document.getElementById('m_course_title').value='';
-      });
+/* Register + Login (index.html expects these IDs) */
+(function attachAuthForms(){
+  const registerBtn = safeGet('registerBtn');
+  const loginBtn = safeGet('loginBtn');
+  const roleSelect = safeGet('roleSelect');
+  if(!registerBtn && !loginBtn) return;
 
-      db.collection('courses').where('teacherId','==',user.uid).onSnapshot(s=>{
-        if(s.empty) coursesWrap.innerHTML = '<div class="small muted">Nuk ka lëndë.</div>';
-        else {
-          let html='';
-          s.forEach(d=>{
-            const c=d.data();
-            html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-              <div><strong>${c.title}</strong><div class="small">Klasa: ${(c.classes||[]).join(',')}</div></div>
-              <div><button data-id="${d.id}" class="delCourseBtn secondary">Fshi</button></div>
-            </div>`;
-          });
-          coursesWrap.innerHTML = html;
-          document.querySelectorAll('.delCourseBtn').forEach(b=>{
-            b.addEventListener('click', async ()=>{
-              if(!confirm('Fshi lëndën?')) return;
-              const id = b.dataset.id;
-              await db.collection('courses').doc(id).delete();
-            });
-          });
+  // show/hide fields handled in index.html scripts too
+  if(registerBtn){
+    registerBtn.addEventListener('click', async ()=>{
+      const name = (safeGet('nameInput')||{}).value || '';
+      const email = (safeGet('emailInput')||{}).value || '';
+      const pass = (safeGet('passInput')||{}).value || '';
+      const role = (safeGet('roleSelect')||{}).value || 'student';
+      if(!name||!email||!pass) return alert('Plotëso të gjitha fushat');
+
+      try {
+        const cred = await auth.createUserWithEmailAndPassword(email, pass);
+        const uid = cred.user.uid;
+        let payload = { role, name, email, createdAt: new Date() };
+        if(role === 'student') {
+          payload.classNum = parseInt((safeGet('classNum')||{}).value) || null;
+        } else {
+          const opts = (safeGet('classList')||{}).selectedOptions || [];
+          payload.classes = Array.from(opts).map(o => parseInt(o.value));
         }
-      });
-    } else {
-      // student view
-      db.collection('courses').where('classes','array-contains',u.classNum).onSnapshot(s=>{
-        if(s.empty) coursesWrap.innerHTML = '<div class="small muted">Nuk ka lëndë për klasën tënde.</div>';
-        else {
-          let html='';
-          s.forEach(d=>{
-            const c=d.data();
-            html += `<div style="margin-bottom:8px"><strong>${c.title}</strong><div class="small">Klasa: ${(c.classes||[]).join(',')}</div></div>`;
-          });
-          coursesWrap.innerHTML = html;
-        }
-      });
-    }
-  }
-
-  // --- SCHEDULE ---
-  const scheduleWrap = document.getElementById('scheduleWrap');
-  if(scheduleWrap){
-    if(u.role==='teacher'){
-      document.getElementById('teacherSchedForm')?.style.display='block';
-      document.getElementById('addSchedBtn')?.addEventListener('click', async ()=>{
-        const day = document.getElementById('daySched').value.trim();
-        const time = document.getElementById('timeSched').value.trim();
-        const subj = document.getElementById('subjSched').value.trim();
-        const cl = parseInt(document.getElementById('classSched').value);
-        if(!day||!time||!subj) return alert('Plotëso fushat');
-        await db.collection('schedule').add({day,time,subject:subj,classes:[cl],teacherId:user.uid,createdAt:new Date()});
-        document.getElementById('daySched').value='';
-        document.getElementById('timeSched').value='';
-        document.getElementById('subjSched').value='';
-      });
-
-      db.collection('schedule').where('teacherId','==',user.uid).onSnapshot(s=>{
-        if(s.empty) scheduleWrap.innerHTML = '<div class="small muted">Nuk ka orar të vendosur.</div>';
-        else {
-          let html='';
-          s.forEach(d=>{
-            const o=d.data();
-            html += `<div style="margin-bottom:8px;"><strong>${o.day} ${o.time}</strong><div class="small">${o.subject} — Klasa: ${(o.classes||[]).join(',')}</div></div>`;
-          });
-          scheduleWrap.innerHTML = html;
-        }
-      });
-    } else {
-      db.collection('schedule').where('classes','array-contains',u.classNum).onSnapshot(s=>{
-        if(s.empty) scheduleWrap.innerHTML = '<div class="small muted">Nuk ka orar për klasën tënde.</div>';
-        else {
-          let html='';
-          s.forEach(d=>{
-            const o=d.data();
-            html += `<div style="margin-bottom:8px;"><strong>${o.day} ${o.time}</strong><div class="small">${o.subject}</div></div>`;
-          });
-          scheduleWrap.innerHTML = html;
-        }
-      });
-    }
+        await db.collection('users').doc(uid).set(payload);
+        alert('Regjistrimi u krye. Po të ridrejtoj tek paneli...');
+        window.location.href = 'dashboard.html';
+      } catch(err){ alert('Gabim: ' + err.message); }
+    });
   }
 
-  // --- TESTS ---
-  const testsWrap = document.getElementById('testsWrap');
-  if(testsWrap){
-    if(u.role==='teacher'){
-      document.getElementById('teacherTests')?.style.display='block';
-      document.getElementById('addTestBtn')?.addEventListener('click', async ()=>{
-        const s = document.getElementById('testSubject').value.trim();
-        const d = document.getElementById('testDate').value;
-        const cl = parseInt(document.getElementById('testClass').value);
-        if(!s||!d) return alert('Plotëso fushat');
-        await db.collection('tests').add({subject:s,date:d,classes:[cl],teacherId:user.uid,createdAt:new Date()});
-        document.getElementById('testSubject').value='';
-        document.getElementById('testDate').value='';
-      });
-
-      db.collection('tests').where('teacherId','==',user.uid).onSnapshot(s=>{
-        if(s.empty) testsWrap.innerHTML = '<div class="small muted">Nuk ka teste.</div>';
-        else {
-          let html='';
-          s.forEach(d=>{
-            const t=d.data();
-            html += `<div style="margin-bottom:8px;"><strong>${t.date}</strong><div class="small">${t.subject} — Klasa: ${(t.classes||[]).join(',')}</div></div>`;
-          });
-          testsWrap.innerHTML = html;
-        }
-      });
-    } else {
-      db.collection('tests').where('classes','array-contains',u.classNum).onSnapshot(s=>{
-        if(s.empty) testsWrap.innerHTML = '<div class="small muted">Nuk ka teste për klasën tënde.</div>';
-        else {
-          let html='';
-          s.forEach(d=>{
-            const t=d.data();
-            html += `<div style="margin-bottom:8px;"><strong>${t.date}</strong><div class="small">${t.subject}</div></div>`;
-          });
-          testsWrap.innerHTML = html;
-        }
-      });
-    }
+  if(loginBtn){
+    loginBtn.addEventListener('click', async ()=>{
+      const email = (safeGet('emailInput')||{}).value || '';
+      const pass = (safeGet('passInput')||{}).value || '';
+      if(!email || !pass) return alert('Plotëso email dhe fjalëkalimin');
+      try {
+        const cred = await auth.signInWithEmailAndPassword(email, pass);
+        alert('Mirë se erdhe!');
+        window.location.href = 'dashboard.html';
+      } catch(err){ alert('Gabim: ' + err.message); }
+    });
   }
-
-  // --- GRADES ---
-  const gradesWrap = document.getElementById('gradesWrap');
-  if(gradesWrap){
-    if(u.role==='teacher'){
-      document.getElementById('teacherGrades')?.style.display='block';
-      document.getElementById('addGradeBtn')?.addEventListener('click', async ()=>{
-        const email = document.getElementById('studentEmail').value.trim();
-        const subj = document.getElementById('subjectGrade').value.trim();
-        const grade = parseFloat(document.getElementById('gradeValue').value);
-        if(!email||!subj||!grade) return alert('Plotëso fushat');
-        const q = await db.collection('users').where('email','==',email).get();
-        if(q.empty) return alert('Nxënësi nuk u gjet');
-        const studentId = q.docs[0].id;
-        await db.collection('grades').add({studentId,studentEmail:email,subject:subj,grade,teacherId:user.uid,createdAt:new Date()});
-        alert('Nota u shtua');
-      });
-
-      db.collection('grades').where('teacherId','==',user.uid).onSnapshot(s=>{
-        if(s.empty) gradesWrap.innerHTML = '<div class="small muted">Nuk ka nota të vendosura.</div>';
-        else {
-          let html=''; s.forEach(d=>{
-            const g=d.data();
-            html += `<div style="margin-bottom:8px;"><strong>${g.studentEmail}</strong><div class="small">${g.subject}: ${g.grade}</div></div>`;
-          });
-          gradesWrap.innerHTML = html;
-        }
-      });
-    } else {
-      db.collection('grades').where('studentId','==',user.uid).onSnapshot(s=>{
-        if(s.empty) gradesWrap.innerHTML = '<div class="small muted">Nuk ka nota për ju.</div>';
-        else {
-          let html=''; s.forEach(d=>{
-            const g=d.data();
-            html += `<div style="margin-bottom:8px;"><strong>${g.subject}</strong><div class="small">Nota: ${g.grade}</div></div>`;
-          });
-          gradesWrap.innerHTML = html;
-        }
-      });
-    }
-  }
-});
+})();
